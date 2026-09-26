@@ -1,0 +1,387 @@
+// DevSign — Prisma Schema
+// Stack: Prisma ORM + SQLite (dev sandbox) — bascule vers Neon PostgreSQL
+// en changeant uniquement `provider = "postgresql"` + DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Better Auth — tables d'authentification
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String
+  email               String    @unique
+  emailVerified       Boolean   @default(false)
+  image               String?
+  role                String    @default("USER") // USER | ADMIN
+  profession          String? // DEVELOPER | DESIGNER | FREELANCE | AGENCY | CONSULTANT | OTHER
+  onboardingCompleted Boolean   @default(false)
+  plan                String    @default("FREE") // FREE | PRO | AGENCY
+  notificationPrefs   String    @default("{}") // JSON : préférences de notifications
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  companyProfile CompanyProfile?
+  clients        Client[]
+  projects       Project[]
+  contracts      Contract[]
+  payments       Payment[]
+  templates      ContractTemplate[]
+  notifications  Notification[]
+  activities     Activity[]
+  invoices       Invoice[]
+}
+
+model Account {
+  id                      String    @id
+  userId                  String
+  accountId               String
+  providerId              String
+  accessToken             String?
+  refreshToken            String?
+  idToken                 String?
+  accessTokenExpiresAt    DateTime?
+  refreshTokenExpiresAt   DateTime?
+  scope                   String?
+  password                String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// ─────────────────────────────────────────────────────────────
+// DevSign — domaine métier
+// ─────────────────────────────────────────────────────────────
+
+// Profil d'entreprise / personnalisation de l'espace client
+model CompanyProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  businessName   String?
+  logoUrl        String?
+  description    String?
+  email          String?
+  phone          String?
+  address        String?
+  country        String?
+  currency       String   @default("XOF") // XOF (FCFA) | EUR | USD
+  brandColor     String   @default("#059669")
+  footerText     String?
+  welcomeMessage String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Client final (prospect du développeur)
+model Client {
+  id        String   @id @default(cuid())
+  userId    String
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+  company   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  Project[]
+  contracts Contract[]
+
+  @@index([userId])
+  @@index([email])
+}
+
+// Projet — cœur du workflow
+model Project {
+  id             String    @id @default(cuid())
+  userId         String
+  clientId       String
+  name           String
+  description    String?
+  type           String    @default("SITE_VITRINE") // SITE_VITRINE | ECOMMERCE | WEB_APP | MOBILE_APP | SAAS | MAINTENANCE | DESIGN | OTHER
+  startDate      DateTime?
+  deliveryDate   DateTime?
+  totalPrice     Float
+  currency       String    @default("XOF")
+  depositPercent Float     @default(50)
+  depositAmount  Float
+  balanceAmount  Float
+  status         String    @default("DRAFT") // DRAFT | WAITING_SIGNATURE | WAITING_PAYMENT | IN_PROGRESS | COMPLETED | CANCELLED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contracts Contract[]
+  payments  Payment[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([status])
+}
+
+// Contrat — document professionnel envoyé au client
+model Contract {
+  id               String    @id @default(cuid())
+  userId           String
+  clientId         String
+  projectId        String
+  reference        String    @unique // DS-2026-000241
+  publicId         String    @unique // lien public : /c/{publicId}
+  title            String
+  status           String    @default("DRAFT") // DRAFT | SENT | VIEWED | SIGNED | EXPIRED | CANCELLED
+
+  // ── Contenu du contrat (JSON sérialisé, SQLite) ──
+  objectText        String? // Objet du contrat
+  deliverables      String? // JSON array de livrables
+  revisions         Int       @default(2)
+  paymentTermsText  String? // ex: "50 % à la signature, 50 % à la livraison"
+  ipOwnership       String    @default("TRANSFER_AFTER_FULL_PAYMENT") // TRANSFER_AFTER_FULL_PAYMENT | PROVIDER_RETAINS | USAGE_LICENSE
+  maintenanceType   String    @default("NONE") // NONE | MONTHLY | YEARLY | CUSTOM
+  maintenanceText   String?
+  cancellationText  String?
+  signatureNote     String?
+
+  // ── Tarification ──
+  subtotal      Float
+  taxRate       Float @default(0) // en %
+  taxAmount     Float @default(0)
+  discount      Float @default(0)
+  totalAmount   Float
+  currency      String @default("XOF")
+  depositPercent Float @default(50)
+  depositAmount Float
+  balanceAmount Float
+
+  // ── Cycle de vie ──
+  sentAt   DateTime?
+  viewedAt DateTime?
+  signedAt DateTime?
+  paidAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items      ContractItem[]
+  signatures Signature[]
+  payments   Payment[]
+  reminders  Reminder[]
+  activities Activity[]
+  invoices   Invoice[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([projectId])
+  @@index([clientId])
+}
+
+// Lignes de devis du contrat
+model ContractItem {
+  id          String @id @default(cuid())
+  contractId  String
+  name        String
+  description String?
+  quantity    Float  @default(1)
+  unitPrice   Float
+  position    Int    @default(0)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+}
+
+// Modèles de contrats (système + personnalisés)
+model ContractTemplate {
+  id               String   @id @default(cuid())
+  userId           String? // null = modèle système
+  name             String
+  type             String   @default("OTHER")
+  description      String?
+  objectText       String?
+  deliverables     String? // JSON array
+  paymentTermsText String?
+  revisions        Int      @default(2)
+  ipOwnership      String   @default("TRANSFER_AFTER_FULL_PAYMENT")
+  maintenanceType  String   @default("NONE")
+  cancellationText String?
+
+  isSystem Boolean  @default(false)
+  usageCount Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Signature électronique — métadonnées de traçabilité
+model Signature {
+  id            String   @id @default(cuid())
+  contractId    String
+  signerName    String
+  signatureType String   @default("TYPED") // TYPED | DRAWN
+  signatureData String? // texte typé ou base64 du dessin
+  signatureId   String   @unique // identifiant de vérification
+  ipAddress     String?
+  userAgent     String?
+  signedAt      DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+}
+
+// Paiement — via SaaSPay (abstraction PaymentProvider)
+model Payment {
+  id           String    @id @default(cuid())
+  userId       String
+  contractId   String?
+  projectId    String?
+  reference    String    @unique // référence interne PAY-XXXXXX
+  provider     String    @default("SAASPAY")
+  providerTxId String? // référence SaaSPay : SP-829183
+  amount       Float
+  currency     String    @default("XOF")
+  type         String    @default("DEPOSIT") // DEPOSIT | BALANCE | FULL
+  status       String    @default("PENDING") // PENDING | PROCESSING | SUCCESS | FAILED | CANCELLED | REFUNDED
+  checkoutUrl  String?
+  metadata     String? // JSON
+
+  paidAt   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contract Contract? @relation(fields: [contractId], references: [id])
+  project  Project?  @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([contractId])
+  @@index([status])
+  @@index([providerTxId])
+}
+
+// Facture (structure prête pour les fonctionnalités futures)
+model Invoice {
+  id         String    @id @default(cuid())
+  userId     String
+  contractId String?
+  number     String    @unique
+  amount     Float
+  currency   String    @default("XOF")
+  status     String    @default("ISSUED") // ISSUED | PAID | CANCELLED
+  issuedAt   DateTime  @default(now())
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contract Contract? @relation(fields: [contractId], references: [id])
+
+  @@index([userId])
+}
+
+// Centre de notifications
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String?
+  type      String   @default("INFO") // INFO | SUCCESS | WARNING | CONTRACT | PAYMENT
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+// Journal d'activité — traçabilité complète
+model Activity {
+  id         String   @id @default(cuid())
+  userId     String
+  contractId String?
+  type       String // CREATED | SENT | VIEWED | SIGNED | PAID | REMINDER | PROJECT_STARTED | CANCELLED
+  message    String
+  actor      String? // "CLIENT" | "SYSTEM" | nom de l'utilisateur
+  createdAt  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([contractId])
+}
+
+// Relances automatiques (24h / 3j / 7j)
+model Reminder {
+  id          String    @id @default(cuid())
+  contractId  String
+  type        String // AFTER_24H | AFTER_3D | AFTER_7D | MANUAL
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      String    @default("PENDING") // PENDING | SENT | CANCELLED
+  createdAt   DateTime  @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([status])
+}
+
+// Journal d'erreurs (dashboard admin)
+model ErrorLog {
+  id        String   @id @default(cuid())
+  source    String // WEBHOOK | API | EMAIL | PAYMENT | SYSTEM
+  message   String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([source])
+}
