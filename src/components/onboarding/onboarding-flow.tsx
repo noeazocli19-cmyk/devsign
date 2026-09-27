@@ -61,6 +61,7 @@ export function OnboardingFlow({ userName }: { userName: string }) {
           body: JSON.stringify({ targetPlan }),
         });
         const checkoutJson = await checkoutRes.json();
+        if (!checkoutRes.ok) { alert("ERREUR CHECKOUT: " + JSON.stringify(checkoutJson)); }
         if (checkoutRes.ok && checkoutJson?.data?.checkoutUrl) {
           window.location.href = checkoutJson.data.checkoutUrl;
           return;
