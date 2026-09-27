@@ -144,3 +144,8 @@ export const companySchema = z.object({
   footerText: z.string().max(200).optional().nullable(),
   welcomeMessage: z.string().max(200).optional().nullable(),
 });
+
+// ─── Abonnement (Pro / Agency) ─────────────────────────────────
+export const subscriptionCheckoutSchema = z.object({
+  targetPlan: z.enum(["PRO", "AGENCY"]),
+});

@@ -1,4 +1,4 @@
-// ─── SaaSPayProvider ─────────────────────────────────────────
+﻿// ─── SaaSPayProvider ─────────────────────────────────────────
 // Implémentation du PaymentProvider pour SaaSPay.
 //
 // ⚠️ IMPORTANT — conformément au cahier des charges :
@@ -51,7 +51,7 @@ export class SaaSPayProvider implements PaymentProvider {
     if (!cfg.configured) {
       return {
         providerTxId: generateTxId(),
-        checkoutUrl: `/c/${input.publicId}/pay?ref=${encodeURIComponent(input.reference)}`,
+        checkoutUrl: `${input.checkoutBasePath ?? "/c"}/${input.publicId}/pay?ref=${encodeURIComponent(input.reference)}`,
         simulated: true,
       };
     }

@@ -1,4 +1,4 @@
-// ─── Moteur de workflow central — partagé par toutes les routes API ───
+﻿// ─── Moteur de workflow central — partagé par toutes les routes API ───
 // Chaque transition de statut passe par ici pour garantir la cohérence
 // (activités, notifications, emails, relances, statuts projet).
 
@@ -303,7 +303,14 @@ export async function processPaymentEvent(event: { reference?: string; transacti
     data: { status: mapped, paidAt: mapped === "SUCCESS" ? now : null, providerTxId: event.transaction_id ?? event.id ?? payment.providerTxId },
   });
 
-  if (mapped === "SUCCESS") {
+  if (mapped === "SUCCESS" && payment.type === "SUBSCRIPTION") {
+    const meta = payment.metadata ? JSON.parse(payment.metadata) : {};
+    const targetPlan = meta.targetPlan;
+    if (targetPlan === "PRO" || targetPlan === "AGENCY") {
+      await db.user.update({ where: { id: payment.userId }, data: { plan: targetPlan } });
+      await notify(payment.userId, "Abonnement activé 🎉", `Votre abonnement ${targetPlan} est maintenant actif.`, "SUCCESS", `/abonnement`);
+    }
+  } else if (mapped === "SUCCESS") {
     const contract = payment.contract!;
     await db.contract.update({ where: { id: contract.id }, data: { paidAt: now } });
     await db.project.update({ where: { id: contract.projectId }, data: { status: "IN_PROGRESS" } });
@@ -398,4 +405,45 @@ export async function sendManualReminder(contractId: string, userId: string) {
   await db.reminder.create({ data: { contractId: contract.id, type: "MANUAL", scheduledAt: new Date(), sentAt: new Date(), status: "SENT" } });
   await addActivity(userId, contract.id, "REMINDER", `Rappel manuel envoyé à ${contract.client.firstName}`, userId);
   return contract;
+}
+
+// ─── Abonnement payant (Pro / Agency) ───────────────────────────
+// Ne modifie JAMAIS user.plan ici : seul processPaymentEvent (webhook confirme) le fait.
+const SUBSCRIPTION_PRICES: Record<"PRO" | "AGENCY", number> = { PRO: 2000, AGENCY: 6000 };
+
+export async function createSubscriptionPayment(userId: string, targetPlan: "PRO" | "AGENCY") {
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("NOT_FOUND");
+
+  const reference = generatePaymentReference();
+  const amount = SUBSCRIPTION_PRICES[targetPlan];
+
+  const intent = await paymentProvider.createPaymentIntent({
+    reference,
+    amount,
+    currency: "XOF",
+    description: `Abonnement ${targetPlan} - DevSign`,
+    customerName: user.name,
+    customerEmail: user.email,
+    publicId: `sub-${user.id}`,
+    checkoutBasePath: "/abonnement",
+    metadata: { kind: "SUBSCRIPTION", targetPlan },
+  });
+
+  const payment = await db.payment.create({
+    data: {
+      userId: user.id,
+      reference,
+      provider: "SAASPAY",
+      providerTxId: intent.providerTxId,
+      amount,
+      currency: "XOF",
+      type: "SUBSCRIPTION",
+      status: "PENDING",
+      checkoutUrl: intent.checkoutUrl,
+      metadata: JSON.stringify({ simulated: intent.simulated, targetPlan }),
+    },
+  });
+
+  return payment;
 }

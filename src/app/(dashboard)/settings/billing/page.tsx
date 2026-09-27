@@ -1,16 +1,17 @@
-import { Check, Crown } from "lucide-react";
+﻿import { Check, Crown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PLANS } from "@/lib/plans";
 import { formatAmount } from "@/lib/format";
 import { requireUser } from "@/lib/session";
+import { SubscribeButton } from "@/components/billing/subscribe-button";
 
 export const metadata = { title: "Paramètres — Facturation" };
 
 export default async function BillingSettingsPage() {
   const user = await requireUser();
-  const currentPlan = PLANS.find((p) => p.id === user.plan) ?? PLANS[0]!;
+  const currentPlan = PLANS.find((p) => p.id.toUpperCase() === user.plan) ?? PLANS[0]!;
 
   return (
     <div className="space-y-6">
@@ -52,9 +53,21 @@ export default async function BillingSettingsPage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <Button className="w-full" variant={isCurrent ? "outline" : plan.highlighted ? "default" : "outline"} disabled={isCurrent}>
-                  {isCurrent ? "Plan actuel" : "Changer de plan"}
-                </Button>
+                {isCurrent ? (
+                  <Button className="w-full" variant="outline" disabled>
+                    Plan actuel
+                  </Button>
+                ) : plan.id === "free" ? (
+                  <Button className="w-full" variant="outline" disabled>
+                    Rétrogradation indisponible
+                  </Button>
+                ) : (
+                  <SubscribeButton
+                    targetPlan={plan.id.toUpperCase() as "PRO" | "AGENCY"}
+                    label={`Passer ${plan.name}`}
+                    variant={plan.highlighted ? "default" : "outline"}
+                  />
+                )}
               </CardContent>
             </Card>
           );
