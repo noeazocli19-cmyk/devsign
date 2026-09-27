@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, ArrowRight, Code2, Palette, Laptop, Building2, Briefcase, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +27,8 @@ const COUNTRIES = ["Sénégal", "Côte d'Ivoire", "Cameroun", "Bénin", "Togo", 
 
 export function OnboardingFlow({ userName }: { userName: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetPlan = searchParams.get("plan");
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [profession, setProfession] = useState<string | null>(null);
@@ -51,6 +53,19 @@ export function OnboardingFlow({ userName }: { userName: string }) {
         body: JSON.stringify({ profession, businessName: businessName.trim(), logoUrl: logoUrl || null, description: description || null, country, currency }),
       });
       if (!res.ok) throw new Error();
+
+      if (targetPlan === "PRO" || targetPlan === "AGENCY") {
+        const checkoutRes = await fetch("/api/subscription/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetPlan }),
+        });
+        const checkoutJson = await checkoutRes.json();
+        if (checkoutRes.ok && checkoutJson?.data?.checkoutUrl) {
+          window.location.href = checkoutJson.data.checkoutUrl;
+          return;
+        }
+      }
       toast.success("Profil créé 🎉");
       router.push("/projects/new");
       router.refresh();

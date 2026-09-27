@@ -1,4 +1,4 @@
-// ─── Tarification DevSign — configurable depuis le code ───
+﻿// ─── Tarification DevSign — configurable depuis le code ───
 // Les montants sont exprimés en FCFA/mois. Une interface admin pourra
 // les piloter plus tard.
 
@@ -20,7 +20,7 @@ export const PLANS: Plan[] = [
     priceMonthly: 0,
     currency: "XOF",
     tagline: "Pour tester DevSign et signer vos premiers contrats.",
-    features: ["3 contrats / mois", "Modèles basiques", "Signature électronique", "Espace client", "Lien de partage unique"],
+    features: ["1 contrat / mois", "Modèles basiques", "Signature électronique", "Espace client", "Lien de partage unique"],
     highlighted: false,
     cta: "Commencer gratuitement",
   },
@@ -66,7 +66,7 @@ export const PLANS: Plan[] = [
 
 export const FREE_PLAN_LIMITS = {
   /** Nombre maximum de contrats qu'un compte Gratuit peut créer par mois. */
-  monthlyContracts: 3,
+  monthlyContracts: 1,
 } as const;
 
 /** true si le plan donne accès aux fonctionnalités payantes (Pro ou Agency). */

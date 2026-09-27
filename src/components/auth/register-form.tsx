@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import { authClient } from "@/lib/auth-client";
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
+  const onboardingUrl = plan === "PRO" || plan === "AGENCY" ? `/onboarding?plan=${plan}` : "/onboarding";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +27,7 @@ export function RegisterForm() {
     setLoading(true);
     setError(null);
 
-    const { error } = await authClient.signUp.email({ name, email, password, callbackURL: "/onboarding" });
+    const { error } = await authClient.signUp.email({ name, email, password, callbackURL: onboardingUrl });
     if (error) {
       const msg =
         error.status === 422 || error.message?.toLowerCase().includes("already")
@@ -35,7 +38,7 @@ export function RegisterForm() {
       return;
     }
     toast.success("Compte créé 🎉 Bienvenue sur DevSign !");
-    router.push("/onboarding");
+    router.push(onboardingUrl);
     router.refresh();
   }
 

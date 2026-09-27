@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   ArrowRight,
   Check,
@@ -287,7 +287,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Button className="mt-7 w-full" variant={plan.highlighted ? "default" : "outline"} asChild>
-                    <Link href="/register">{plan.cta}</Link>
+                    <Link href={`/register?plan=${plan.id.toUpperCase()}`}>{plan.cta}</Link>
                   </Button>
                 </div>
               ))}
