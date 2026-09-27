@@ -53,7 +53,9 @@ export const auth = betterAuth({
     }
     return [...origins];
   },
-  database: prismaAdapter(db, { provider: "sqlite" }),
+  database: prismaAdapter(db, {
+    provider: (process.env.DATABASE_URL ?? "").startsWith("file:") ? "sqlite" : "postgresql",
+  }),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
