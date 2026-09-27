@@ -15,9 +15,13 @@ const PROTECTED_PREFIXES = [
   "/onboarding",
 ];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const hasSession = req.cookies.has("better-auth.session_token");
+  // Better Auth préfixe le cookie de session avec « __Secure- » en HTTPS
+  // (production, ex. Vercel) et le laisse nu en HTTP (développement local).
+  const hasSession =
+    req.cookies.has("better-auth.session_token") ||
+    req.cookies.has("__Secure-better-auth.session_token");
 
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
