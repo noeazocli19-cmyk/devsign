@@ -258,6 +258,15 @@ export function ProjectWizard({
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
+        // Paywall : limite du plan Gratuit atteinte → proposer la mise à niveau
+        if (json?.code === "PLAN_LIMIT_REACHED") {
+          toast.error(json.error ?? "Limite du plan Gratuit atteinte (3 contrats/mois).", {
+            duration: 10000,
+            action: { label: "Passer Pro", onClick: () => router.push("/abonnement") },
+          });
+          router.push("/abonnement");
+          return;
+        }
         toast.error(json.error ?? "Impossible de créer le contrat. Réessayez.");
         return;
       }

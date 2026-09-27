@@ -60,3 +60,16 @@ export const PLANS: Plan[] = [
     cta: "Choisir Agency",
   },
 ];
+
+// ─── Paywall — limites du plan Gratuit ───────────────────────
+// Appliquée côté serveur dans POST /api/projects (jamais côté client seul).
+
+export const FREE_PLAN_LIMITS = {
+  /** Nombre maximum de contrats qu'un compte Gratuit peut créer par mois. */
+  monthlyContracts: 3,
+} as const;
+
+/** true si le plan donne accès aux fonctionnalités payantes (Pro ou Agency). */
+export function isPaidPlan(plan: string): boolean {
+  return plan === "PRO" || plan === "AGENCY";
+}
