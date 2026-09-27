@@ -15,7 +15,9 @@ export async function POST(req: Request) {
 
     return ok({ checkoutUrl: payment.checkoutUrl, simulated: isSimulationMode() });
   } catch (e) {
-    return handleApiError(e, "POST /api/subscription/checkout");
+    // TEMPORAIRE - diagnostic - a retirer apres
+    const msg = e instanceof Error ? e.message : String(e);
+    return fail(`DEBUG: ${msg}`, 500);
   }
 }
 
